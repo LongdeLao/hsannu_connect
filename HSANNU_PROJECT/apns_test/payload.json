@@ -1,0 +1,12 @@
+{
+    "aps": {
+        "event": "update",
+        "timestamp": 1744801069,
+        "content-state": {
+            "status": "approved",
+            "responseTime": null,
+            "respondedBy": "Principal Johnson"
+        }
+    },
+    "activity-id": "12123923-AF7F-4775-B36A-742E0D3B6C90"
+}

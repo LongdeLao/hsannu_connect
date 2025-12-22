@@ -1,0 +1,1 @@
+{ "name": "aasa-server", "version": "1.0.0", "description": "Server for Apple App Site Association file", "main": "server.js", "scripts": { "start": "node server.js" }, "author": "", "license": "ISC" }

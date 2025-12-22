@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.HSANNU" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/ios_blue</item>
+        <item name="colorPrimaryVariant">@color/ios_blue_dark</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/ios_blue</item>
+        <item name="colorSecondaryVariant">@color/ios_blue_dark</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <!-- Surfaces -->
+        <item name="android:colorBackground">@color/ios_background</item>
+        <item name="android:navigationBarColor">@color/ios_background</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

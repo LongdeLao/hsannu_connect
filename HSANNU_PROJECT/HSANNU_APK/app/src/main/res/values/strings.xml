@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">HSANNU</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Messages</string>
+    <string name="title_events">Events</string>
+    <string name="title_classes">Classes</string>
+
+    <string name="sign_in_title">Welcome back</string>
+    <string name="sign_in">Sign in</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="error_required">Required</string>
+    <string name="error_incorrect_credentials">Incorrect credentials</string>
+    <string name="error_user_not_found">User not found</string>
+    <string name="error_login_failed">Login failed</string>
+    <string name="action_sign_out">Sign out</string>
+    <string name="greeting">Welcome, %1$s</string>
+</resources>
