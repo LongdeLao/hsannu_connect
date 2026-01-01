@@ -48,7 +48,7 @@ export interface UserRole {
 export const studentNavigation: NavigationItem[] = [
   {
     title: "Dashboard",
-    url: "/shared/dashboard",
+    url: "/student",
     icon: IconDashboard,
   },
   {
@@ -153,7 +153,7 @@ async function generateAttendanceNavigation(): Promise<NavigationItem[]> {
 const baseStaffNavigation: NavigationItem[] = [
   {
     title: "Dashboard",
-    url: "/shared/dashboard",
+    url: "/staff",
     icon: IconDashboard,
   },
   {

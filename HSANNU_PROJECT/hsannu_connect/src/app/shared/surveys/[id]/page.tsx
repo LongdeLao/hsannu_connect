@@ -53,7 +53,7 @@ interface VotingEvent {
   sub_votes?: SubVote[]
 }
 
-type Selection = { optionId: number; customInput: string }
+type Selection = { optionId: number; customInputByOption: Record<number, string> }
  
 function formatDate(input: string): string {
   const d = new Date(input)
@@ -118,7 +118,7 @@ export default function SurveyDetailPage() {
           if (sv.user_vote) {
             seeded[sv.id] = {
               optionId: sv.user_vote.option_id,
-              customInput: sv.user_vote.custom_input ?? "",
+              customInputByOption: { [sv.user_vote.option_id]: sv.user_vote.custom_input ?? "" },
             }
           }
         }
@@ -146,17 +146,20 @@ export default function SurveyDetailPage() {
       ...prev,
       [subVoteId]: {
         optionId,
-        customInput: prev[subVoteId]?.customInput ?? "",
+        customInputByOption: prev[subVoteId]?.customInputByOption ?? {},
       },
     }))
   }
 
-  const setCustomInput = (subVoteId: number, value: string) => {
+  const setCustomInput = (subVoteId: number, optionId: number, value: string) => {
     setSelections((prev) => ({
       ...prev,
       [subVoteId]: {
         optionId: prev[subVoteId]?.optionId ?? 0,
-        customInput: value,
+        customInputByOption: {
+          ...(prev[subVoteId]?.customInputByOption ?? {}),
+          [optionId]: value,
+        },
       },
     }))
   }
@@ -180,7 +183,7 @@ export default function SurveyDetailPage() {
             body: JSON.stringify({
               sub_vote_id: sv.id,
               option_id: sel.optionId,
-              custom_input: sel.customInput || undefined,
+              custom_input: sel.customInputByOption?.[sel.optionId] || undefined,
             }),
           })
         )
@@ -318,6 +321,8 @@ export default function SurveyDetailPage() {
       <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         {(event.sub_votes ?? []).map((sv) => {
           const selected = selections[sv.id]?.optionId ?? 0
+          const options = sv.options ?? []
+          const isCustomOnly = options.length === 1 && Boolean(options[0]?.has_custom_input)
           const totalVotesForSv = (sv.options ?? []).reduce((sum, o) => sum + (o.vote_count ?? 0), 0)
           return (
             <Card key={sv.id} className="h-full border-0 shadow-none bg-transparent">
@@ -328,21 +333,31 @@ export default function SurveyDetailPage() {
                 )}
               </CardHeader>
               <CardContent className="space-y-3">
+                {isCustomOnly ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={selections[sv.id]?.customInputByOption?.[options[0]!.id] ?? ""}
+                      onChange={(e) => setCustomInput(sv.id, options[0]!.id, e.target.value)}
+                      placeholder="Write something"
+                      disabled={!isActive}
+                      onFocus={() => isActive && setSelection(sv.id, options[0]!.id)}
+                      className="dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-100"
+                    />
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label={sv.title}>
-                  {(sv.options ?? []).map((opt) => {
+                    {options.map((opt) => {
                     const active = selected === opt.id
                     return (
-                      <button
+                        <div
                         key={opt.id}
-                        type="button"
                         role="radio"
                         aria-checked={active}
                         onClick={() => isActive && setSelection(sv.id, opt.id)}
-                        disabled={!isActive}
                         className={[
-                          "flex items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
+                            "flex items-center gap-2 rounded-md px-3 py-2 transition-colors",
                           active ? "bg-primary/5" : "hover:bg-muted",
-                          !isActive ? "opacity-60" : "",
+                            !isActive ? "opacity-60 pointer-events-none" : "",
                         ].join(" ")}
                       >
                         <span
@@ -359,21 +374,24 @@ export default function SurveyDetailPage() {
                             ].join(" ")}
                           />
                         </span>
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
                         <span className="text-sm">{opt.text}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {selected !== 0 && (sv.options ?? []).find((o) => o.id === selected)?.has_custom_input && (
-                  <div className="pt-2">
-                    <label className="mb-1 block text-xs text-muted-foreground">Additional details</label>
+                            {opt.has_custom_input && (
                     <Input
-                      value={selections[sv.id]?.customInput ?? ""}
-                      onChange={(e) => setCustomInput(sv.id, e.target.value)}
-                      placeholder="Type here..."
+                                value={selections[sv.id]?.customInputByOption?.[opt.id] ?? ""}
+                                onChange={(e) => setCustomInput(sv.id, opt.id, e.target.value)}
+                                placeholder="Write something"
                       disabled={!isActive}
-                    />
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onFocus={() => isActive && setSelection(sv.id, opt.id)}
+                                className="w-48 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-100"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -399,7 +417,7 @@ export default function SurveyDetailPage() {
       </div>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[420px]" title="Delete survey">
           <DialogHeader>
             <DialogTitle>Delete survey</DialogTitle>
             <DialogDescription>

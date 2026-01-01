@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { X, ChevronDown, ChevronRight, Home } from "lucide-react"
+import { X, ChevronRight, Home } from "lucide-react"
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { API_URL } from "@/config"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
@@ -16,9 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { cn } from "@/lib/utils"
+import { UnifiedDatePicker, UnifiedDateTimeValue } from "@/components/unified-date-picker"
 
 // Types aligned with server API
 interface VoteOption {
@@ -77,6 +75,7 @@ interface NewSubVoteForm {
   title: string
   description?: string
   options: NewOptionForm[]
+  customInputOnly?: boolean
 }
 
 interface NewSurveyForm {
@@ -159,13 +158,13 @@ export default function SurveysPage() {
           { text: "", hasCustomInput: false },
           { text: "", hasCustomInput: false },
         ],
+        customInputOnly: false,
       },
     ],
   })
 
-  const [deadlineDate, setDeadlineDate] = useState<string>("")
-  const [deadlineTime, setDeadlineTime] = useState<string>("")
-  const [deadlineOpen, setDeadlineOpen] = useState(false)
+  // unified deadline state handled by UnifiedDatePicker
+  const [deadlineUnified, setDeadlineUnified] = useState<UnifiedDateTimeValue>({ date: new Date() })
 
   function updateForm<K extends keyof NewSurveyForm>(key: K, value: NewSurveyForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -183,7 +182,7 @@ export default function SurveysPage() {
       ...prev,
       subVotes: [
         ...prev.subVotes,
-        { title: "", description: "", options: [ { text: "", hasCustomInput: false }, { text: "", hasCustomInput: false } ] },
+        { title: "", description: "", options: [ { text: "", hasCustomInput: false }, { text: "", hasCustomInput: false } ], customInputOnly: false },
       ],
     }))
   }
@@ -226,11 +225,17 @@ export default function SurveysPage() {
     if (!userId) return
     setCreating(true)
     try {
-      // Ensure ISO deadline from styled date/time inputs
+      // Build ISO deadline from unified picker
       let deadlineISO = ""
-      if (deadlineDate) {
-        const localIso = new Date(`${deadlineDate}T${deadlineTime || "23:59"}:00`).toISOString()
-        deadlineISO = localIso
+      if (deadlineUnified.date) {
+        const d = deadlineUnified.date
+        const [hours, minutes, seconds] = (() => {
+          if (!deadlineUnified.time) return [23, 59, 0]
+          const parts = deadlineUnified.time.split(":").map((n) => parseInt(n, 10))
+          return [parts[0] || 0, parts[1] || 0, parts[2] || 0] as const
+        })()
+        const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), hours, minutes, seconds))
+        deadlineISO = utcDate.toISOString()
       }
       const payload = {
         title: form.title,
@@ -263,11 +268,10 @@ export default function SurveysPage() {
         title: "",
         description: "",
         subVotes: [
-          { title: "", description: "", options: [ { text: "", hasCustomInput: false }, { text: "", hasCustomInput: false } ] },
+          { title: "", description: "", options: [ { text: "", hasCustomInput: false }, { text: "", hasCustomInput: false } ], customInputOnly: false },
         ],
       })
-      setDeadlineDate("")
-      setDeadlineTime("")
+      setDeadlineUnified({ date: new Date() })
 
       await loadEvents(userId)
     } catch (e) {
@@ -276,7 +280,7 @@ export default function SurveysPage() {
     } finally {
       setCreating(false)
     }
-  }, [form, userId, loadEvents, deadlineDate, deadlineTime])
+  }, [form, userId, loadEvents, deadlineUnified])
 
   // Default tab selection
   const normalizedEvents: VotingEvent[] = useMemo(() => {
@@ -323,7 +327,12 @@ export default function SurveysPage() {
             </div>
             <Dialog open={createOpen} onOpenChange={(open) => { if (!open) { if (confirm('Discard this survey? Your changes will be lost.')) setCreateOpen(false); } else { setCreateOpen(true); } }}>
               <Button size="sm" onClick={() => setCreateOpen(true)}>Create new survey</Button>
-              <DialogContent onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()} className="h-[85vh] w-full max-w-xl overflow-hidden p-0 flex flex-col">
+              <DialogContent 
+                title="Create new survey"
+                onEscapeKeyDown={(e) => e.preventDefault()} 
+                onPointerDownOutside={(e) => e.preventDefault()} 
+                className="h-[85vh] w-full max-w-xl overflow-hidden p-0 flex flex-col"
+              >
                 <DialogHeader className="sticky top-0 z-10 border-b bg-background/80 px-6 py-4 backdrop-blur">
                   <Button size="icon" variant="ghost" className="absolute right-2 top-2" onClick={() => { if (confirm('Discard this survey? Your changes will be lost.')) setCreateOpen(false) }}>
                     <X className="size-5" />
@@ -341,44 +350,13 @@ export default function SurveysPage() {
                     <Input id="desc" value={form.description ?? ""} onChange={(e) => updateForm("description", e.target.value)} placeholder="Short description" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Deadline</Label>
-                    <div className="flex items-center gap-2">
-                      <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            id="deadline-date-picker"
-                            className={cn("w-32 justify-between font-normal", !deadlineDate && "text-muted-foreground")}
-                          >
-                            {deadlineDate ? new Date(deadlineDate).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            }) : "Select date"}
-                            <ChevronDown className="ml-2 size-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            captionLayout="dropdown"
-                            selected={deadlineDate ? new Date(deadlineDate) : undefined}
-                            onSelect={(d) => { setDeadlineDate(d ? d.toISOString().slice(0, 10) : ""); setDeadlineOpen(false) }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-
-                      <Input
-                        type="time"
-                        value={deadlineTime}
-                        onChange={(e) => setDeadlineTime(e.target.value)}
-                        id="deadline-time-picker"
-                        step="1"
-                        className="w-[140px] bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                      />
-                    </div>
+                    <UnifiedDatePicker
+                      label="Deadline"
+                      required
+                      value={deadlineUnified}
+                      onChange={setDeadlineUnified}
+                      description={deadlineUnified.date ? `The survey will close on ${deadlineUnified.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}` : "Pick a deadline for your survey"}
+                    />
                   </div>
 
                   {form.subVotes.map((sv, i) => (
@@ -386,7 +364,7 @@ export default function SurveysPage() {
                       <div className="mb-3 flex items-center justify-between">
                         <div className="text-sm font-medium">Question {i + 1}</div>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => addOption(i)}>Add option</Button>
+                          <Button size="sm" variant="outline" onClick={() => addOption(i)} disabled={Boolean(sv.customInputOnly)}>Add option</Button>
                           <Button size="sm" variant="ghost" onClick={() => removeSubVote(i)} disabled={form.subVotes.length === 1}>Remove</Button>
                         </div>
                       </div>
@@ -400,7 +378,30 @@ export default function SurveysPage() {
                       </div>
 
                       <div className="mt-3 space-y-2">
+                        <div className="flex items-center justify-between">
                         <div className="text-xs font-medium text-muted-foreground">Options</div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`cio-${i}`}
+                              checked={Boolean(sv.customInputOnly)}
+                              onCheckedChange={(v) =>
+                                updateSubVote(i, {
+                                  customInputOnly: Boolean(v),
+                                  options: Boolean(v)
+                                    ? [ { text: "", hasCustomInput: true } ]
+                                    : [ { text: "", hasCustomInput: false }, { text: "", hasCustomInput: false } ],
+                                })
+                              }
+                            />
+                            <Label htmlFor={`cio-${i}`} className="text-xs">Custom input only</Label>
+                          </div>
+                        </div>
+                        {sv.customInputOnly ? (
+                          <div className="flex items-center gap-2">
+                            <Input className="flex-1" value="" placeholder="Respondents will type their own answer" disabled />
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">Single free-text response</div>
+                          </div>
+                        ) : (
                         <div className="flex flex-col gap-2">
                           {sv.options.map((opt, j) => (
                             <div key={j} className="flex items-center gap-2">
@@ -413,6 +414,7 @@ export default function SurveysPage() {
                             </div>
                           ))}
                         </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -422,7 +424,7 @@ export default function SurveysPage() {
                   </div>
                 </div>
                 <DialogFooter className="sticky bottom-0 z-10 border-t bg-background/80 px-6 py-4 backdrop-blur">
-                  <Button onClick={handleCreate} disabled={creating || !form.title.trim()}>{creating ? "Creating..." : "Create survey"}</Button>
+                  <Button onClick={handleCreate} disabled={creating || !form.title.trim() || !deadlineUnified.date}>{creating ? "Creating..." : "Create survey"}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

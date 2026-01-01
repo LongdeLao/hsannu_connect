@@ -4,10 +4,23 @@ import React, { useEffect, useId, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useOutsideClick } from "@/hooks/use-outside-click"
 import { Badge } from "@/components/ui/badge"
-import { UserCheck, Clock, AlertCircle, Users, X, Calendar, BookOpen } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { UserCheck, Clock, AlertCircle, Users, Calendar, BookOpen, MoreVertical, Check, X } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+
+import { getSubjectIconForName } from "@/lib/subjects"
+import { convertUTCToShanghaiTime } from "@/lib/utils"
+
 
 interface Student {
   user_id?: number
@@ -22,6 +35,14 @@ interface Student {
 
 interface StudentCardsProps {
   students: Student[]
+  onAttendanceChange?: (studentId: number, status: string) => Promise<void>
+  onMarkArrival?: (studentId: number) => Promise<void>
+  hasAttendanceRole?: boolean
+  selectedStudents?: Set<number>
+  onStudentSelect?: (studentId: number, checked: boolean) => void
+  onSelectAll?: (checked: boolean) => void
+  onBulkAttendanceChange?: (status: string) => Promise<void>
+  bulkLoading?: boolean
 }
 
 interface StudentInfoApiResponse {
@@ -77,13 +98,27 @@ const CloseIcon = () => {
   )
 }
 
-export function StudentCards({ students }: StudentCardsProps) {
+export function StudentCards({ 
+  students, 
+  onAttendanceChange, 
+  onMarkArrival,
+  hasAttendanceRole,
+  selectedStudents,
+  onStudentSelect,
+  onSelectAll,
+  onBulkAttendanceChange,
+  bulkLoading
+}: StudentCardsProps) {
   const [active, setActive] = useState<Student | null>(null)
   const [info, setInfo] = useState<StudentInfoApiResponse | null>(null)
   const [infoLoading, setInfoLoading] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
+  const [loadingStudentId, setLoadingStudentId] = useState<number | null>(null)
+  const { toast } = useToast()
+
   const ref = useRef<HTMLDivElement>(null)
   const id = useId()
+
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -137,6 +172,7 @@ export function StudentCards({ students }: StudentCardsProps) {
       case "Late": return "secondary"
       case "Absent": return "destructive"
       case "Medical": return "outline"
+      case "Pending": return "secondary"
       default: return "secondary"
     }
   }
@@ -147,20 +183,58 @@ export function StudentCards({ students }: StudentCardsProps) {
       case "Late": return <Clock className="w-3 h-3" />
       case "Absent": return <AlertCircle className="w-3 h-3" />
       case "Medical": return <UserCheck className="w-3 h-3" />
-      default: return <Users className="w-3 h-3" />
+      case "Pending": return <Clock className="w-3 h-3" />
+      default: return <Clock className="w-3 h-3" />
     }
   }
+
+
 
   const getImageUrl = (student: Student) => {
     const userId = student.user_id || student.id
     if (userId) {
-      return `https://connect.hsannu.com/api/student_formal_images/${userId}.jpg`
+      // For demo privacy, always use placeholder
+  return "/placeholder-avatar.svg"
     }
     return "/placeholder-avatar.svg"
   }
 
   const getStudentId = (student: Student) => {
     return student.user_id || student.id || 'N/A'
+  }
+
+  const handleAttendanceChange = async (student: Student, status: string) => {
+    if (!onAttendanceChange || !hasAttendanceRole) return
+    
+    const studentId = student.user_id || student.id
+    if (!studentId) {
+      toast({
+        title: "Error",
+        description: "Student ID not found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoadingStudentId(studentId)
+    
+    try {
+      await onAttendanceChange(studentId, status)
+      
+      toast({
+        title: "Attendance Updated",
+        description: `Marked ${student.name} as ${status}`,
+      })
+    } catch (error) {
+      console.error('Error updating attendance:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update attendance. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingStudentId(null)
+    }
   }
 
   const renderInfoContent = () => {
@@ -277,7 +351,10 @@ export function StudentCards({ students }: StudentCardsProps) {
               {s.classes.map((c, i) => (
                 <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                   <div>
-                    <p className="font-medium text-sm text-foreground">{c.subject}</p>
+                    <p className="font-medium text-sm text-foreground flex items-center gap-2">
+                      {(() => { const Icon = getSubjectIconForName(c.subject); return <Icon className="h-3.5 w-3.5" />; })()}
+                      {c.subject}
+                    </p>
                     {c.code && <p className="text-xs text-muted-foreground">{c.code}</p>}
                   </div>
                   <p className="text-sm text-muted-foreground">{c.teacher_name || c.initials || '—'}</p>
@@ -354,7 +431,7 @@ export function StudentCards({ students }: StudentCardsProps) {
                       className="text-xs text-muted-foreground mt-1"
                     >
                       Student ID: {getStudentId(active)}
-                      {active.arrival_time && ` • Arrived at ${active.arrival_time}`}
+                      {active.arrival_time && ` • Arrived at ${convertUTCToShanghaiTime(active.arrival_time)}`}
                     </motion.p>
                   </div>
 
@@ -378,55 +455,250 @@ export function StudentCards({ students }: StudentCardsProps) {
         ) : null}
       </AnimatePresence>
       
+      {/* Bulk Operations Header */}
+      {hasAttendanceRole && selectedStudents && onStudentSelect && onSelectAll && onBulkAttendanceChange && students.length > 0 && (
+        <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedStudents.size === students.length && students.length > 0}
+                onCheckedChange={onSelectAll}
+                className="h-4 w-4"
+              />
+              <span className="text-sm text-muted-foreground">Select All</span>
+            </div>
+            {selectedStudents.size > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {selectedStudents.size} selected
+              </span>
+            )}
+          </div>
+          
+          {selectedStudents.size > 0 && (
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={bulkLoading}
+                    className="text-xs"
+                  >
+                    {bulkLoading ? (
+                      <div className="h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent mr-1" />
+                    ) : (
+                      <Check className="h-3 w-3 mr-1" />
+                    )}
+                    Mark Selected
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => onBulkAttendanceChange('Present')}
+                    className="cursor-pointer"
+                  >
+                    <Check className="mr-2 h-4 w-4 text-green-600" />
+                    Present
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onBulkAttendanceChange('Late')}
+                    className="cursor-pointer"
+                  >
+                    <Clock className="mr-2 h-4 w-4 text-yellow-600" />
+                    Late
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onBulkAttendanceChange('Absent')}
+                    className="cursor-pointer"
+                  >
+                    <X className="mr-2 h-4 w-4 text-red-600" />
+                    Absent
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onBulkAttendanceChange('Medical')}
+                    className="cursor-pointer"
+                  >
+                    <UserCheck className="mr-2 h-4 w-4 text-blue-600" />
+                    Medical
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onBulkAttendanceChange('Pending')}
+                    className="cursor-pointer text-muted-foreground"
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Pending
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSelectAll(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Student List */}
       <div className="space-y-3">
-        {students.map((student) => (
-          <motion.div
-            layoutId={`card-${student.name}-${id}`}
-            key={`card-${student.name}-${id}`}
-            onClick={() => setActive(student)}
-            className="p-4 flex flex-col md:flex-row justify-between items-center rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex gap-4 flex-col md:flex-row items-center md:items-start">
-              <motion.div layoutId={`image-${student.name}-${id}`}>
-                <img
-                  width={100}
-                  height={100}
-                  src={getImageUrl(student)}
-                  alt={student.name}
-                  className="h-16 w-16 md:h-12 md:w-12 rounded-lg object-cover object-center"
-                  onError={(e) => {
-                    e.currentTarget.src = "/placeholder-avatar.svg"
-                  }}
-                />
-              </motion.div>
-              <div className="text-center md:text-left">
-                <motion.h3
-                  layoutId={`title-${student.name}-${id}`}
-                  className="font-medium text-foreground"
-                >
-                  {student.name}
-                </motion.h3>
-                <motion.p
-                  layoutId={`description-${getStudentId(student)}-${id}`}
-                  className="text-muted-foreground text-sm"
-                >
-                  {student.arrival_time ? `Arrived at ${student.arrival_time}` : `ID: ${getStudentId(student)}`}
-                </motion.p>
-              </div>
-            </div>
-            
+        {students.map((student) => {
+          const studentId = student.user_id || student.id
+          const isLoading = loadingStudentId === studentId
+          
+          return (
             <motion.div
-              layoutId={`badge-${student.name}-${id}`}
-              className="mt-4 md:mt-0"
+              layoutId={`card-${student.user_id || student.id}`}
+              key={student.user_id || student.id}
+              className="p-4 flex flex-col md:flex-row justify-between items-center rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <Badge variant={getStatusBadgeVariant(student.today)} className="gap-1">
-                {getStatusIcon(student.today)}
-                {student.today}
-              </Badge>
+              <div className="flex items-center gap-4 flex-1">
+                {hasAttendanceRole && selectedStudents && onStudentSelect && (
+                  <Checkbox
+                    checked={selectedStudents.has(studentId as number)}
+                    onCheckedChange={(checked) => onStudentSelect(studentId as number, !!checked)}
+                    className="h-4 w-4"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+                <div 
+                  onClick={() => setActive(student)}
+                  className="flex gap-4 flex-col md:flex-row items-center md:items-start cursor-pointer flex-1"
+                >
+                <motion.div layoutId={`image-${student.name}-${id}`}>
+                  <img
+                    width={100}
+                    height={100}
+                    src={getImageUrl(student)}
+                    alt={student.name}
+                    className="h-16 w-16 md:h-12 md:w-12 rounded-lg object-cover object-center"
+                    onError={(e) => {
+                      e.currentTarget.src = "/placeholder-avatar.svg"
+                    }}
+                  />
+                </motion.div>
+                <div className="text-center md:text-left">
+                  <motion.h3
+                    layoutId={`title-${student.name}-${id}`}
+                    className="font-medium text-foreground"
+                  >
+                    {student.name}
+                  </motion.h3>
+                  <motion.p
+                    layoutId={`description-${getStudentId(student)}-${id}`}
+                    className="text-muted-foreground text-sm"
+                  >
+                    {student.arrival_time ? `Arrived at ${convertUTCToShanghaiTime(student.arrival_time)}` : `ID: ${getStudentId(student)}`}
+                  </motion.p>
+                </div>
+              </div>
+              
+              <motion.div
+                layoutId={`badge-${student.name}-${id}`}
+                className="mt-4 md:mt-0 flex items-center gap-2"
+              >
+                <Badge variant={getStatusBadgeVariant(student.today)} className="gap-1">
+                  {getStatusIcon(student.today)}
+                  {student.today}
+                </Badge>
+                
+                {hasAttendanceRole && onAttendanceChange && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-muted/80"
+                        disabled={isLoading}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {isLoading ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                        ) : (
+                          <MoreVertical className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Mark attendance</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAttendanceChange(student, 'Present')
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Check className="mr-2 h-4 w-4 text-green-600" />
+                        Present
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAttendanceChange(student, 'Late')
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Clock className="mr-2 h-4 w-4 text-yellow-600" />
+                        Late
+                      </DropdownMenuItem>
+                      {student.today === 'Late' && onMarkArrival && !student.arrival_time && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const studentId = student.user_id || student.id
+                            if (studentId) {
+                              onMarkArrival(studentId)
+                            }
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Clock className="mr-2 h-4 w-4 text-orange-600" />
+                          Mark Arrival
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        handleAttendanceChange(student, 'Absent')
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <X className="mr-2 h-4 w-4 text-red-600" />
+                        Absent
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAttendanceChange(student, 'Medical')
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <UserCheck className="mr-2 h-4 w-4 text-blue-600" />
+                        Medical
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAttendanceChange(student, 'Pending')
+                        }}
+                        className="cursor-pointer text-muted-foreground"
+                      >
+                        Clear to Pending
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </motion.div>
+              </div>
             </motion.div>
-          </motion.div>
-        ))}
+          )
+        })}
       </div>
     </>
   )

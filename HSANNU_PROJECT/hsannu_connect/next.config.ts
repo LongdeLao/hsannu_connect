@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "connect.hsannu.com" },
       { protocol: "http", hostname: "connect.hsannu.com" },
+      { protocol: "https", hostname: "*.hsannu.com" },
+      { protocol: "http", hostname: "*.hsannu.com" },
     ],
     minimumCacheTTL: 60 * 60 * 24 * 7,
   },

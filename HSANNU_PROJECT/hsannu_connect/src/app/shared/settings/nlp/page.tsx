@@ -6,8 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { NLPDatePicker } from "@/components/nlp-date-picker";
+import { UnifiedDatePicker, type UnifiedDateTimeValue } from "@/components/unified-date-picker";
+import { getDateInputMode, setDateInputMode, type DateInputMode } from "@/lib/preferences";
+import React from "react";
 
 export default function NLPSettingsPage() {
+  const [currentMode, setCurrentMode] = React.useState<DateInputMode>("default");
+  const [classicDemo, setClassicDemo] = React.useState<UnifiedDateTimeValue>({});
+
+  React.useEffect(() => {
+    setCurrentMode(getDateInputMode());
+  }, []);
+
+  const handleSetMode = (mode: DateInputMode) => {
+    setDateInputMode(mode);
+    setCurrentMode(mode);
+  };
+
   return (
     <div className="p-6">
       {/* Breadcrumbs */}
@@ -48,46 +63,52 @@ export default function NLPSettingsPage() {
 
       {/* Content */}
       <div className="space-y-6">
-        {/* Date Processing Section */}
+        {/* Onboarding: Choose default & try it out */}
         <Card>
           <CardHeader>
-            <CardTitle>Date Processing</CardTitle>
-            <CardDescription>
-              Parse natural language into structured dates
-            </CardDescription>
+            <CardTitle>Choose your default date input</CardTitle>
+            <CardDescription>Try both options below, then set your default. You can change this anytime.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Try typing natural language dates like &quot;tomorrow&quot;, &quot;next Friday&quot;, &quot;in 2 weeks&quot;, or &quot;December 25th&quot;
-              </p>
-              
-              <div className="max-w-md">
-                <NLPDatePicker
-                  placeholder="Try: tomorrow, next week, in 3 days..."
-                  label="Natural Language Date Input"
-                  description="Parsed date: {date}"
-                />
-              </div>
-
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <h4 className="text-sm font-medium">Examples you can try:</h4>
-                <div className="grid gap-2 text-xs text-muted-foreground">
-                  <div className="flex gap-4">
-                    <span className="font-mono bg-background px-2 py-1 rounded">tomorrow</span>
-                    <span className="font-mono bg-background px-2 py-1 rounded">next Friday</span>
-                    <span className="font-mono bg-background px-2 py-1 rounded">in 2 weeks</span>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-lg border p-4 bg-muted/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium">Classic picker</h3>
+                  {currentMode === "default" && <Badge variant="secondary">Current</Badge>}
+                </div>
+                <div className="space-y-2">
+                  <UnifiedDatePicker
+                    mode="default"
+                    label="Try the classic picker"
+                    value={classicDemo}
+                    onChange={setClassicDemo}
+                    description={classicDemo.date ? `Selected: ${classicDemo.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}${classicDemo.time ? ` ${classicDemo.time}` : ''}` : "Pick a date (and optional time)"}
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant={currentMode === "default" ? "default" : "outline"} onClick={() => handleSetMode("default")}>Use Classic as default</Button>
                   </div>
-                  <div className="flex gap-4">
-                    <span className="font-mono bg-background px-2 py-1 rounded">December 25th</span>
-                    <span className="font-mono bg-background px-2 py-1 rounded">end of month</span>
-                    <span className="font-mono bg-background px-2 py-1 rounded">3 days ago</span>
+                </div>
+              </div>
+              <div className="rounded-lg border p-4 bg-muted/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium">Natural Language (NLP)</h3>
+                  {currentMode === "nlp" && <Badge variant="secondary">Current</Badge>}
+                </div>
+                <div className="space-y-2">
+                  <NLPDatePicker
+                    placeholder="Try: tomorrow, next Friday, in 3 days..."
+                    label="Try NLP date input"
+                    description="Parsed date: {date}"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant={currentMode === "nlp" ? "default" : "outline"} onClick={() => handleSetMode("nlp")}>Use NLP as default</Button>
                   </div>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
 
         {/* Advanced Settings */}
         <Card>

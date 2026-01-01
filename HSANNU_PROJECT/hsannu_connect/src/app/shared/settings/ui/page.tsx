@@ -39,6 +39,18 @@ const THEMES = [
     name: "Warm Tomes", 
     description: "Cozy earth tones and vintage feel",
     preview: { bg: "#f0efe9", text: "#333d29", accent: "#ba854f", border: "#d3cebc" }
+  },
+  {
+    id: "sage-garden",
+    name: "Sage Garden",
+    description: "Calming greens with natural tones",
+    preview: { bg: "#edefe8", text: "#212619", accent: "#588157", border: "#d1e0d9" }
+  },
+  {
+    id: "rose-garden",
+    name: "Rose Garden",
+    description: "Soft pinks with vibrant accents",
+    preview: { bg: "#fffafb", text: "#470213", accent: "#ff8fab", border: "#ffceda" }
   }
 ] as const;
 

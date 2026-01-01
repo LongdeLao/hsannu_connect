@@ -10,6 +10,7 @@ import {
 } from "motion/react";
 
 import { useRef, useState, useEffect } from "react";
+import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
@@ -202,12 +203,12 @@ const FloatingDockMobile = ({
                   }}
                   transition={{ delay: (items.length - 1 - idx) * 0.05 }}
                 >
-                  <a
+                  <Link
                     href={it.href}
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 dark:bg-neutral-900"
                   >
                     <div className="h-4 w-4">{it.icon}</div>
-                  </a>
+                  </Link>
                 </motion.div>
               );
             })}
@@ -295,14 +296,14 @@ function IconContainer({
     return val - bounds.x - bounds.width / 2;
   });
 
-  const widthTransform = useTransform(distance, [-150, 0, 150], [40, 80, 40]);
-  const heightTransform = useTransform(distance, [-150, 0, 150], [40, 80, 40]);
+  const widthTransform = useTransform(distance, [-150, 0, 150], [40, 56, 40]);
+  const heightTransform = useTransform(distance, [-150, 0, 150], [40, 56, 40]);
 
-  const widthTransformIcon = useTransform(distance, [-150, 0, 150], [20, 40, 20]);
+  const widthTransformIcon = useTransform(distance, [-150, 0, 150], [20, 28, 20]);
   const heightTransformIcon = useTransform(
     distance,
     [-150, 0, 150],
-    [20, 40, 20],
+    [20, 28, 20],
   );
 
   const width = useSpring(widthTransform, {
@@ -330,7 +331,7 @@ function IconContainer({
   const [hovered, setHovered] = useState(false);
 
   return (
-    <a href={href}>
+    <Link href={href}>
       <motion.div
         ref={ref}
         style={{ width, height }}
@@ -357,6 +358,6 @@ function IconContainer({
           {icon}
         </motion.div>
       </motion.div>
-    </a>
+    </Link>
   );
 }

@@ -9,15 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Event, EventFormData, createEvent, updateEvent } from "@/lib/api";
+import { Event, EventFormData, createEvent, updateEvent, getImageUrl } from "@/lib/api";
 import { ImageUpload } from "./image-upload";
 import { useToast } from "@/hooks/use-toast";
+import { UnifiedDatePicker, UnifiedDateTimeValue } from "@/components/unified-date-picker"
 
 interface ImageFile extends File {
   preview?: string;
   id: string;
-  uploadProgress?: number;
   uploadStatus?: 'pending' | 'uploading' | 'success' | 'error';
+  uploadProgress?: number;
   error?: string;
 }
 
@@ -40,18 +41,31 @@ export function EventForm({
 }: EventFormProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<EventFormData>({
-    title: '',
-    eventDescription: '',
-    address: '',
-    eventDate: selectedDate || new Date(),
-    isWholeDay: true,
-    startTime: undefined,
-    endTime: undefined,
+    title: event?.title || '',
+    eventDescription: event?.eventDescription || '',
+    address: event?.address || '',
+    eventDate: event ? new Date(event.eventDate) : selectedDate || new Date(),
+    isWholeDay: event?.isWholeDay ?? true,
+    startTime: event?.startTime ? new Date(event.startTime) : undefined,
+    endTime: event?.endTime ? new Date(event.endTime) : undefined,
     images: undefined
   });
-  const [selectedImages, setSelectedImages] = useState<ImageFile[]>([]);
+
+  // Convert existing image paths to ImageFile objects for preview
+  const [selectedImages, setSelectedImages] = useState<ImageFile[]>(
+    event?.images?.map((image, index) => ({
+      id: `existing-${index}`,
+      name: image.filePath.split('/').pop() || '',
+      size: 0,
+      type: 'image/*',
+      preview: getImageUrl(image.filePath),
+      uploadStatus: 'success',
+      uploadProgress: 100,
+    } as unknown as ImageFile)) || []
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const [dateUnified, setDateUnified] = useState<UnifiedDateTimeValue>({ date: (event ? new Date(event.eventDate) : selectedDate) || new Date(), time: '' })
 
   useEffect(() => {
     if (event) {
@@ -66,6 +80,7 @@ export function EventForm({
         endTime: event.endTime ? new Date(event.endTime) : undefined,
         images: undefined
       });
+      setDateUnified({ date: new Date(event.eventDate), time: event.startTime ? formatTimeForInput(new Date(event.startTime)) : '' })
     } else if (selectedDate) {
       // Creating new event with selected date/time
       const startTime = selectedHour !== undefined 
@@ -85,6 +100,7 @@ export function EventForm({
         endTime,
         images: undefined
       });
+      setDateUnified({ date: selectedDate, time: selectedHour !== undefined ? `${String(selectedHour).padStart(2, '0')}:00:00` : '' })
     }
   }, [event, selectedDate, selectedHour]);
 
@@ -100,7 +116,7 @@ export function EventForm({
     }
   }, [selectedImages]);
 
-  const handleInputChange = (field: keyof EventFormData, value: any) => {
+  const handleInputChange = <K extends keyof EventFormData>(field: K, value: EventFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -180,36 +196,16 @@ export function EventForm({
 
     setLoading(true);
     try {
-      // First, upload any pending images
-      const pendingImages = selectedImages.filter(img => img.uploadStatus === 'pending');
-      
-      if (pendingImages.length > 0) {
-        toast({
-          title: "Uploading images...",
-          description: `Uploading ${pendingImages.length} image(s)`,
-        });
-
-        // Simulate upload for each pending image
-        await Promise.all(pendingImages.map(image => simulateUpload(image)));
-        
-        toast({
-          title: "Images uploaded successfully",
-          variant: "success",
-        });
-      }
-
-      // Convert ImageFile[] back to File[] for API submission
-      const imageFiles = selectedImages
-        .filter(img => img.uploadStatus === 'success' || img.uploadStatus === 'pending')
-        .map(img => {
-          // Create a new File object without the extra properties
-          return new File([img], img.name, { type: img.type });
-        });
+      // Convert selected images to File objects
+      const imageFiles = selectedImages.filter((img) => img instanceof File) as File[];
 
       const submitData = {
         ...formData,
+        eventDate: dateUnified.date || formData.eventDate,
+        startTime: formData.isWholeDay ? undefined : (dateUnified.date && dateUnified.time ? parseTimeInput(dateUnified.time, dateUnified.date) : formData.startTime),
+        endTime: formData.isWholeDay ? undefined : formData.endTime,
         images: imageFiles.length > 0 ? imageFiles : undefined
-      };
+      } as EventFormData;
 
       if (event) {
         await updateEvent(event.eventID, submitData);
@@ -277,7 +273,7 @@ export function EventForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0 flex flex-col" title={event ? "Edit Event" : "Create New Event"}>
         <DialogHeader className="p-6 pb-4">
           <DialogTitle className="text-xl font-semibold">
             {event ? 'Edit Event' : 'Create New Event'}
@@ -342,16 +338,15 @@ export function EventForm({
 
             {/* Date */}
             <div className="space-y-2">
-              <Label htmlFor="eventDate" className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Date
-              </Label>
-              <Input
-                id="eventDate"
-                type="date"
-                value={format(formData.eventDate, 'yyyy-MM-dd')}
-                onChange={(e) => handleInputChange('eventDate', new Date(e.target.value))}
-                className="rounded-xl border-0 bg-muted/50 focus:bg-background transition-colors"
+              <UnifiedDatePicker
+                label="Date"
+                value={dateUnified}
+                onChange={(v) => {
+                  setDateUnified(v)
+                  if (v.date) handleInputChange('eventDate', v.date)
+                  if (!formData.isWholeDay && v.time) handleInputChange('startTime', parseTimeInput(v.time, v.date || formData.eventDate))
+                }}
+                description={dateUnified.date ? `The event will be scheduled for ${dateUnified.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}` : "Pick a date for your event"}
               />
             </div>
 
@@ -377,17 +372,7 @@ export function EventForm({
                     <Clock className="h-4 w-4" />
                     Start Time *
                   </Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={formData.startTime ? formatTimeForInput(formData.startTime) : ''}
-                    onChange={(e) => 
-                      handleInputChange('startTime', parseTimeInput(e.target.value, formData.eventDate))
-                    }
-                    className={`rounded-xl border-0 bg-muted/50 focus:bg-background transition-colors ${
-                      errors.startTime ? 'ring-2 ring-destructive' : ''
-                    }`}
-                  />
+                  <Input id="startTime" type="time" value={formData.startTime ? formatTimeForInput(formData.startTime) : (dateUnified.time || '')} onChange={(e) => { setDateUnified(prev => ({ ...prev, time: e.target.value })); handleInputChange('startTime', parseTimeInput(e.target.value, formData.eventDate)) }} className={`rounded-xl border-0 bg-muted/50 focus:bg-background transition-colors ${errors.startTime ? 'ring-2 ring-destructive' : ''}`} />
                   {errors.startTime && (
                     <p className="text-sm text-destructive">{errors.startTime}</p>
                   )}

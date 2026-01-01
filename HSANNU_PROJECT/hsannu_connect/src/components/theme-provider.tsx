@@ -62,6 +62,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         dark: "dark",
         "deep-sea": "deep-sea",
         "warm-tomes": "warm-tomes",
+        "sage-garden": "sage-garden",
+        "rose-garden": "rose-garden",
       }}
     >
       <DarkClassSync />

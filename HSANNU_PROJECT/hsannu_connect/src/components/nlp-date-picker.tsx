@@ -106,6 +106,7 @@ export function NLPDatePicker({
               mode="single"
               selected={date}
               captionLayout="dropdown"
+              className="rounded-md border shadow-sm"
               month={month}
               onMonthChange={setMonth}
               onSelect={handleDateSelect}

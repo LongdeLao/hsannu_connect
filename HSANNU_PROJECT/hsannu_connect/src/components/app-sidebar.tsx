@@ -18,22 +18,35 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { getNavigationForRole, getNavigationForRoleAsync, getCurrentUser, getCurrentUserRole, type UserRole } from "@/lib/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   user?: UserRole
 }
 
 export const AppSidebar = React.memo(function AppSidebar({ user, ...props }: AppSidebarProps) {
+  const { user: authUser } = useAuth()
+  
   // Memoize the user role to prevent unnecessary navigation reloads
   const userRole = React.useMemo(() => {
-    const userData = user || getCurrentUser()
-    return userData?.role || getCurrentUserRole()
-  }, [user?.role])
+    // Use authUser from context first, then passed user prop, then fallback to localStorage
+    if (authUser?.role) return authUser.role
+    if (user?.role) return user.role
+    return getCurrentUserRole()
+  }, [authUser?.role, user?.role])
 
   // Memoize the current user to prevent unnecessary re-renders
   const memoizedCurrentUser = React.useMemo(() => {
+    if (authUser) {
+      return {
+        role: authUser.role,
+        name: authUser.name,
+        email: authUser.email || '',
+        avatar: '/avatars/default.jpg', // Always use placeholder for privacy
+      } as UserRole
+    }
     return user || getCurrentUser()
-  }, [user?.name, user?.email, user?.avatar, userRole])
+  }, [authUser, user, userRole])
 
   // Initialize navigation with a synchronous fallback to avoid empty first render
   const [navigationData, setNavigationData] = useState(() => getNavigationForRole(userRole))
@@ -65,7 +78,7 @@ export const AppSidebar = React.memo(function AppSidebar({ user, ...props }: App
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <div className="flex items-center gap-2 cursor-pointer">
-                <Image src="/logo.png" alt="HSANNU" width={20} height={20} className="rounded-sm" priority />
+                <Image src="/logo.png" alt="HSANNU" width={20} height={20} className="rounded-sm" priority unoptimized />
                 <span className="text-base font-semibold">HSANNU</span>
               </div>
             </SidebarMenuButton>

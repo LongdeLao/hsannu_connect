@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { PasswordInput } from '@/components/ui/password-input';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/solid';
 import { API_URL } from '../../../config';
@@ -78,28 +79,26 @@ function ResetPasswordContent() {
           <label htmlFor="password" className="block text-sm text-gray-600 dark:text-neutral-300 mb-1">
             New Password
           </label>
-          <input
-            id="password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full border-b border-gray-300 dark:border-neutral-600 focus:border-black dark:focus:border-neutral-400 outline-none py-2 bg-transparent text-gray-800 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500"
-            placeholder="At least 8 characters"
-          />
+<PasswordInput
+    id="password"
+    value={newPassword}
+    onChange={(e) => setNewPassword(e.target.value)}
+    className="w-full border-b border-gray-300 dark:border-neutral-600 focus:border-black dark:focus:border-neutral-400 outline-none py-2 bg-transparent text-gray-800 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500"
+    placeholder="At least 8 characters"
+  />
         </div>
 
         <div className="mb-4">
           <label htmlFor="confirm" className="block text-sm text-gray-600 dark:text-neutral-300 mb-1">
             Confirm Password
           </label>
-          <input
-            id="confirm"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full border-b border-gray-300 dark:border-neutral-600 focus:border-black dark:focus:border-neutral-400 outline-none py-2 bg-transparent text-gray-800 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500"
-            placeholder="Re-enter new password"
-          />
+<PasswordInput
+    id="confirm"
+    value={confirmPassword}
+    onChange={(e) => setConfirmPassword(e.target.value)}
+    className="w-full border-b border-gray-300 dark:border-neutral-600 focus:border-black dark:focus:border-neutral-400 outline-none py-2 bg-transparent text-gray-800 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500"
+    placeholder="Re-enter new password"
+  />
         </div>
 
 

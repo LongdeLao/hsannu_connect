@@ -310,7 +310,7 @@ export default function SurveyStatsPage() {
       </section>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[420px]" title="Delete survey">
           <DialogHeader>
             <DialogTitle>Delete survey</DialogTitle>
             <DialogDescription>

@@ -14,6 +14,9 @@ SERVER_PATH="/var/www/html"
 APP_NAME="hsannu_connect"
 LOCAL_BUILD_DIR="hsannu_connect_deploy"
 BACKUP_DIR="backups"
+# Inserted: password and SSH options for non-interactive auth
+SERVER_PASSWORD='g4w3gbzb7#A3'
+SSH_BASE_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 # Colors for output
 RED='\033[0;31m'
@@ -64,16 +67,35 @@ check_dependencies() {
     if ! command -v scp &> /dev/null; then
         log_error "scp is not installed"
     fi
+	
+	# Ensure sshpass is available for non-interactive SSH/SCP
+	if ! command -v sshpass &> /dev/null; then
+		log_warning "sshpass is not installed; attempting to install..."
+		if command -v brew &> /dev/null; then
+			# Homebrew (macOS) - install via tap since sshpass is not in core
+			if ! brew list sshpass >/dev/null 2>&1; then
+				brew install hudochenkov/sshpass/sshpass || log_error "Failed to install sshpass via Homebrew. Install it manually and re-run."
+			fi
+		elif command -v apt-get &> /dev/null; then
+			# Debian/Ubuntu
+			sudo apt-get update -y && sudo apt-get install -y sshpass || log_error "Failed to install sshpass with apt-get."
+		elif command -v yum &> /dev/null; then
+			# RHEL/CentOS
+			sudo yum install -y epel-release && sudo yum install -y sshpass || log_error "Failed to install sshpass with yum."
+		else
+			log_error "sshpass is required but could not be installed automatically. Please install sshpass and rerun."
+		fi
+	fi
     
     log_success "All dependencies are available"
 }
 
 test_server_connection() {
     log_info "Testing server connection..."
-    if ! ssh -o ConnectTimeout=10 -o BatchMode=yes $SERVER_USER@$SERVER_HOST "echo 'Connection successful'" >/dev/null 2>&1; then
-        log_warning "Cannot connect to server without password. You'll be prompted for passwords during deployment."
+	if sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS -o ConnectTimeout=10 $SERVER_USER@$SERVER_HOST "echo 'Connection successful'" >/dev/null 2>&1; then
+		log_success "Server connection test passed"
     else
-        log_success "Server connection test passed"
+		log_error "Cannot connect to server with provided credentials."
     fi
 }
 
@@ -176,7 +198,7 @@ EOF
 backup_current_deployment() {
     log_info "Creating backup of current deployment..."
     
-    ssh $SERVER_USER@$SERVER_HOST "
+	sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS $SERVER_USER@$SERVER_HOST "
         if [ -d '$SERVER_PATH/$LOCAL_BUILD_DIR' ]; then
             mkdir -p '$SERVER_PATH/$BACKUP_DIR'
             backup_name=\"${APP_NAME}_backup_\$(date +%Y%m%d_%H%M%S)\"
@@ -193,7 +215,7 @@ backup_current_deployment() {
 upload_to_server() {
     log_info "Uploading deployment package to server..."
     
-    scp "${LOCAL_BUILD_DIR}.tar.gz" $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
+	sshpass -p "$SERVER_PASSWORD" scp $SSH_BASE_OPTS "${LOCAL_BUILD_DIR}.tar.gz" $SERVER_USER@$SERVER_HOST:$SERVER_PATH/
     
     log_success "Upload completed"
 }
@@ -201,7 +223,7 @@ upload_to_server() {
 deploy_on_server() {
     log_info "Deploying application on server..."
     
-    ssh $SERVER_USER@$SERVER_HOST "
+	sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS $SERVER_USER@$SERVER_HOST "
         set -e
         cd '$SERVER_PATH'
         
@@ -226,7 +248,7 @@ deploy_on_server() {
 manage_pm2_process() {
     log_info "Managing PM2 process..."
     
-    ssh $SERVER_USER@$SERVER_HOST "
+	sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS $SERVER_USER@$SERVER_HOST "
         cd '$SERVER_PATH/$LOCAL_BUILD_DIR'
         
         # Stop existing process if running
@@ -248,32 +270,13 @@ manage_pm2_process() {
     log_success "PM2 process management completed"
 }
 
-update_nginx_config() {
-    log_info "Ensuring nginx configuration is correct..."
-    
-    ssh $SERVER_USER@$SERVER_HOST "
-        # Backup current nginx config
-        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup.\$(date +%Y%m%d_%H%M%S)
-        
-        # Ensure sites-enabled is properly symlinked
-        if [ ! -L '/etc/nginx/sites-enabled/default' ]; then
-            rm -f /etc/nginx/sites-enabled/default
-            ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
-        fi
-        
-        # Test and reload nginx
-        nginx -t && systemctl reload nginx
-        
-        echo 'Nginx configuration updated'
-    "
-    
-    log_success "Nginx configuration verified"
-}
+# update_nginx_config removed per request to avoid modifying nginx config
+
 
 cleanup_server() {
     log_info "Cleaning up server..."
     
-    ssh $SERVER_USER@$SERVER_HOST "
+	sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS $SERVER_USER@$SERVER_HOST "
         cd '$SERVER_PATH'
         rm -f '${LOCAL_BUILD_DIR}.tar.gz'
         
@@ -293,7 +296,7 @@ verify_deployment() {
     log_info "Verifying deployment..."
     
     # Check PM2 status
-    ssh $SERVER_USER@$SERVER_HOST "
+	sshpass -p "$SERVER_PASSWORD" ssh $SSH_BASE_OPTS $SERVER_USER@$SERVER_HOST "
         echo 'PM2 Status:'
         pm2 status $APP_NAME
         
@@ -307,12 +310,11 @@ verify_deployment() {
         fi
         
         echo ''
-        echo 'Nginx Status:'
+		echo 'Nginx Status (skipped check by request):'
         if systemctl is-active --quiet nginx; then
-            echo '✅ Nginx is running'
+			echo 'ℹ️ Nginx is running'
         else
-            echo '❌ Nginx is not running'
-            exit 1
+			echo 'ℹ️ Nginx is not running'
         fi
     "
     
@@ -341,7 +343,6 @@ main() {
     upload_to_server
     deploy_on_server
     manage_pm2_process
-    update_nginx_config
     cleanup_server
     
     # Verification

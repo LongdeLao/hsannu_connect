@@ -11,11 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { IconLayoutNavbar, IconLayoutSidebarLeftExpand, IconCheck } from "@tabler/icons-react";
+import { setDateInputMode, getDateInputMode, DateInputMode } from "@/lib/preferences"
 
 const THEMES = [
 	{ id: "system", name: "System (Light/Dark/Default)", description: "Follows your system preference", preview: { bg: "linear-gradient(135deg, #ffffff 50%, #0a0a0a 50%)", text: "#666" } },
 	{ id: "deep-sea", name: "Deep Sea", description: "Rich blues and calming depths", preview: { bg: "#0d1b2a", text: "#f9f9f8", accent: "#778da9", border: "#1b263b" } },
 	{ id: "warm-tomes", name: "Warm Tomes", description: "Cozy earth tones and vintage feel", preview: { bg: "#f0efe9", text: "#333d29", accent: "#ba854f", border: "#d3cebc" } },
+	{ id: "sage-garden", name: "Sage Garden", description: "Calming greens with natural tones", preview: { bg: "#edefe8", text: "#212619", accent: "#588157", border: "#d1e0d9" } },
+	{ id: "rose-garden", name: "Rose Garden", description: "Soft pinks with vibrant accents", preview: { bg: "#fffafb", text: "#470213", accent: "#ff8fab", border: "#ffceda" } },
 	{ id: "font-sans", name: "Font: Sans", description: "Coming soon", disabled: true, preview: { bg: "#ffffff", text: "#0a0a0a", border: "#e5e5e5" } },
 	{ id: "font-serif", name: "Font: Serif", description: "Coming soon", disabled: true, preview: { bg: "#ffffff", text: "#0a0a0a", border: "#e5e5e5" } },
 	{ id: "font-mono", name: "Font: Mono", description: "Coming soon", disabled: true, preview: { bg: "#ffffff", text: "#0a0a0a", border: "#e5e5e5" } },
@@ -28,12 +31,13 @@ type LayoutKey = "sidebar" | "dock";
 export function OnboardingDialog() {
 	const { theme, setTheme } = useTheme();
 	const [open, setOpen] = React.useState(false);
-	const [step, setStep] = React.useState(-1); // -1: intro, 0: theme, 1: layout
+	const [step, setStep] = React.useState(-1); // -1: intro, 0: theme, 1: layout, 2: date mode, 3: done
 	const [direction, setDirection] = React.useState(1);
 	const [selectedLayout, setSelectedLayout] = React.useState<LayoutKey>(() => {
 		if (typeof window === "undefined") return "sidebar";
 		return (localStorage.getItem("ui-layout") as LayoutKey) || "sidebar";
 	});
+	const [selectedDateMode, setSelectedDateMode] = React.useState<DateInputMode>(() => (typeof window !== "undefined" ? getDateInputMode() : "default"));
 
 	React.useEffect(() => {
 		try {
@@ -45,19 +49,20 @@ export function OnboardingDialog() {
 		} catch {}
 	}, []);
 
-	const goNext = () => { setDirection(1); setStep((s) => Math.min(s + 1, 2)); };
+	const goNext = () => { setDirection(1); setStep((s) => Math.min(s + 1, 3)); };
 	const goBack = () => { setDirection(-1); setStep((s) => Math.max(s - 1, -1)); };
 
 	const finish = React.useCallback(() => {
 		try {
 			if (typeof window !== "undefined") {
 				localStorage.setItem("ui-layout", selectedLayout);
+				setDateInputMode(selectedDateMode)
 				localStorage.setItem("onboarding_done", "true");
 			}
 		} finally {
 			setOpen(false);
 		}
-	}, [selectedLayout]);
+	}, [selectedLayout, selectedDateMode]);
 
 	const skipAll = React.useCallback(() => {
 		try {
@@ -72,7 +77,7 @@ export function OnboardingDialog() {
 	}, [setTheme]);
 
 	React.useEffect(() => {
-		if (step === 2) {
+		if (step === 3) {
 			const timer = setTimeout(() => finish(), 5000);
 			return () => clearTimeout(timer);
 		}
@@ -80,10 +85,13 @@ export function OnboardingDialog() {
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogContent className="w-full max-w-5xl md:h-[60vh] md:max-h-[70%] p-0 overflow-hidden bg-background border rounded-xl shadow-lg">
+			<DialogContent 
+				className="w-full max-w-5xl md:h-[70vh] md:max-h-[80%] p-0 overflow-hidden bg-background border rounded-xl shadow-lg"
+				title="Onboarding"
+			>
 				<div className="flex flex-col h-full">
-					<div className="flex-1 px-6 py-6 md:px-8 md:py-8">
-						<div className="relative min-h-[300px]">
+					<div className="flex-1 px-6 py-6 md:px-8 md:py-8 flex items-center justify-center">
+						<div className="relative min-h-[400px] w-full max-w-4xl">
 							<AnimatePresence initial={false} custom={direction}>
 								{step === -1 && (
 									<motion.section
@@ -94,13 +102,13 @@ export function OnboardingDialog() {
 										exit="exit"
 										variants={slideVariants}
 										transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-										className="flex flex-col items-start text-left gap-3 sm:gap-4 max-w-2xl"
+										className="flex flex-col items-center text-center gap-6 sm:gap-8 max-w-3xl mx-auto"
 									>
-										<h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
-											<span className="inline-block rounded-full bg-primary/10 px-3 py-1 mr-2">Shall we</span>
+										<h2 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
+											<span className="inline-block rounded-full bg-primary/10 px-4 py-2 mr-3">Shall we</span>
 											customize your UI?
 										</h2>
-										<p className="text-sm sm:text-base text-muted-foreground">We can tailor the look and layout so everything feels just right.</p>
+										<p className="text-lg sm:text-xl text-muted-foreground max-w-2xl">We can tailor the look and layout so everything feels just right.</p>
 									</motion.section>
 								)}
 
@@ -113,10 +121,10 @@ export function OnboardingDialog() {
 										exit="exit"
 										variants={slideVariants}
 										transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-										className="flex flex-col gap-4"
+										className="flex flex-col gap-6"
 									>
-										<h3 className="text-sm font-medium">Theme</h3>
-										<div className="grid grid-cols-2 gap-3 sm:gap-4">
+										<h3 className="text-lg font-medium">Theme</h3>
+										<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 											{THEMES.map((t) => (
 												<ThemePreview
 													key={t.id}
@@ -138,10 +146,10 @@ export function OnboardingDialog() {
 										exit="exit"
 										variants={slideVariants}
 										transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-										className="flex flex-col gap-4"
+										className="flex flex-col gap-6"
 									>
-										<h3 className="text-sm font-medium">Layout</h3>
-										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+										<h3 className="text-lg font-medium">Layout</h3>
+										<div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
 											<LayoutCard
 												label="Sidebar"
 												description="Traditional sidebar navigation"
@@ -169,6 +177,34 @@ export function OnboardingDialog() {
 								)}
 								{step === 2 && (
 									<motion.section
+										key="step-date-mode"
+										custom={direction}
+										initial="enter"
+										animate="center"
+										exit="exit"
+										variants={slideVariants}
+										transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+										className="flex flex-col gap-6"
+									>
+										<h3 className="text-lg font-medium">Date input preference</h3>
+										<div className="grid grid-cols-1 gap-4 max-w-2xl">
+											<DateModeCard
+												label="Default picker"
+												description="Use standard calendar and time inputs"
+												isActive={selectedDateMode === "default"}
+												onClick={() => { setSelectedDateMode("default"); setDateInputMode("default"); }}
+											/>
+											<DateModeCard
+												label="Natural language"
+												description="Type things like 'next Friday' or 'in 2 weeks'"
+												isActive={selectedDateMode === "nlp"}
+												onClick={() => { setSelectedDateMode("nlp"); setDateInputMode("nlp"); }}
+											/>
+										</div>
+									</motion.section>
+								)}
+								{step === 3 && (
+									<motion.section
 										key="step-done"
 										custom={direction}
 										initial="enter"
@@ -176,41 +212,54 @@ export function OnboardingDialog() {
 										exit="exit"
 										variants={slideVariants}
 										transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-										className="flex flex-col items-start text-left gap-3 sm:gap-4 max-w-2xl"
+										className="flex flex-col items-center text-center gap-6 sm:gap-8 max-w-3xl mx-auto"
 									>
-										<h2 className="text-2xl sm:text-3xl font-semibold">All set!</h2>
-										<p className="text-sm sm:text-base text-muted-foreground">Your theme and layout have been saved. This will close automatically in a few seconds.</p>
+										<h2 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">All set!</h2>
+										<p className="text-lg sm:text-xl text-muted-foreground max-w-2xl">Your theme and layout have been saved. This will close automatically in a few seconds.</p>
 									</motion.section>
 								)}
 							</AnimatePresence>
 						</div>
 					</div>
 
-					<div className="px-6 py-4 md:px-8 md:py-6 flex justify-end gap-2">
-						{step === -1 && (
-							<>
-								<Button variant="ghost" onClick={skipAll}>Nah, I&apos;m good</Button>
-								<Button onClick={goNext}>Let&apos;s go</Button>
-							</>
-						)}
-						{step === 0 && (
-							<>
-								<Button variant="outline" onClick={goBack}>Back</Button>
-								<Button onClick={goNext}>Next</Button>
-							</>
-						)}
-						{step === 1 && (
-							<>
-								<Button variant="outline" onClick={goBack}>Back</Button>
-								<Button onClick={() => { setDirection(1); setStep(2); }}>Finish</Button>
-							</>
-						)}
-						{step === 2 && (
-							<>
-								<Button variant="outline" onClick={goBack}>Back</Button>
-								<Button onClick={finish}>Finish</Button>
-							</>
-						)}
+					<div className="px-6 py-4 md:px-8 md:py-6 border-t bg-background/50 backdrop-blur">
+						<div className="flex justify-between items-center max-w-4xl mx-auto">
+							<div className="flex-1">
+								{/* Empty space for balance */}
+							</div>
+							<div className="flex gap-3">
+								{step === -1 && (
+									<>
+										<Button variant="ghost" onClick={skipAll}>Nah, I&apos;m good</Button>
+										<Button onClick={goNext}>Let&apos;s go</Button>
+									</>
+								)}
+								{step === 0 && (
+									<>
+										<Button variant="outline" onClick={goBack}>Back</Button>
+										<Button onClick={goNext}>Next</Button>
+									</>
+								)}
+								{step === 1 && (
+									<>
+										<Button variant="outline" onClick={goBack}>Back</Button>
+										<Button onClick={() => { setDirection(1); setStep(2); }}>Next</Button>
+									</>
+								)}
+								{step === 2 && (
+									<>
+										<Button variant="outline" onClick={goBack}>Back</Button>
+										<Button onClick={() => { setDirection(1); setStep(3); }}>Next</Button>
+									</>
+								)}
+								{step === 3 && (
+									<Button onClick={finish}>Finished</Button>
+								)}
+							</div>
+							<div className="flex-1">
+								{/* Empty space for balance */}
+							</div>
+						</div>
 					</div>
 				</div>
 			</DialogContent>
@@ -299,24 +348,24 @@ function LayoutCard({ label, description, isActive, onClick, children }: {
 			)}
 			onClick={onClick}
 		>
-			<CardContent className="p-3">
-				<div className="space-y-2">
-					<div className="h-16 bg-muted rounded border overflow-hidden relative">
+			<CardContent className="p-4">
+				<div className="flex items-center gap-4">
+					<div className="h-20 w-32 bg-muted rounded border overflow-hidden relative flex-shrink-0">
 						{children}
 					</div>
-					<div className="space-y-0.5">
+					<div className="flex-1 space-y-2">
 						<div className="flex items-center justify-between">
-							<h4 className="font-medium text-xs flex items-center gap-2">
+							<h4 className="font-medium text-base flex items-center gap-2">
 								{label === "Sidebar" ? (
-									<IconLayoutSidebarLeftExpand className="h-4 w-4" />
+									<IconLayoutSidebarLeftExpand className="h-5 w-5" />
 								) : (
-									<IconLayoutNavbar className="h-4 w-4" />
+									<IconLayoutNavbar className="h-5 w-5" />
 								)}
 								{label}
 							</h4>
-							{isActive && <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary">Active</span>}
+							{isActive && <span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Active</span>}
 						</div>
-						<p className="text-[11px] text-muted-foreground leading-tight">{description}</p>
+						<p className="text-sm text-muted-foreground">{description}</p>
 					</div>
 				</div>
 			</CardContent>
@@ -384,4 +433,18 @@ function DockMiniature({ isActive }: { isActive: boolean }) {
 			)}
 		</>
 	);
+} 
+
+function DateModeCard({ label, description, isActive, onClick }: { label: string; description: string; isActive: boolean; onClick: () => void }) {
+	return (
+		<Card className={cn("cursor-pointer transition-all duration-200 hover:shadow-md", isActive ? "ring-2 ring-primary ring-offset-2" : "")} onClick={onClick}>
+			<CardContent className="p-4 flex items-start gap-3">
+				<div className={cn("mt-1 size-4 rounded-full border", isActive ? "bg-primary" : "bg-muted border-border")}></div>
+				<div>
+					<div className="font-medium">{label}</div>
+					<div className="text-sm text-muted-foreground">{description}</div>
+				</div>
+			</CardContent>
+		</Card>
+	)
 } 

@@ -10,7 +10,6 @@ import {
 import {
   Avatar,
   AvatarFallback,
-  // AvatarImage, // replaced by next/image for caching
 } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -28,17 +27,18 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { usePathname, useRouter } from "next/navigation"
-import { deleteCookie } from 'cookies-next'
 import type { UserRole } from "@/lib/navigation"
 import React from "react"
 import Image from "next/image"
 import { getCachedAvatarDataUrl, cacheAvatarDataUrl } from "@/lib/avatar-cache"
+import { useAuth } from "@/contexts/auth-context"
 
 export function NavUser({
   user,
 }: {
   user: UserRole
 }) {
+  const { logout } = useAuth()
   const { isMobile } = useSidebar()
   const pathname = usePathname()
   const router = useRouter()
@@ -59,52 +59,57 @@ export function NavUser({
   }
 
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem('loggedIn')
-    localStorage.removeItem('user')
-    
-    // Clear cookies
-    deleteCookie('userId')
-    deleteCookie('userRole')
-    
-    // Navigate to login page
-    router.push('/login')
+    // Use auth context logout function
+    logout()
   }
 
   const [avatarErrored, setAvatarErrored] = React.useState(false)
-  const [displayAvatar, setDisplayAvatar] = React.useState<string>(() => {
-    try {
-      if (typeof window === 'undefined') return user.avatar
-      const stored = localStorage.getItem('user')
-      if (!stored) return user.avatar
-      const parsed = JSON.parse(stored) as { id?: string | number }
-      const uid = parsed?.id ? String(parsed.id) : ''
-      const cached = uid ? getCachedAvatarDataUrl(uid) : null
-      return cached || user.avatar
-    } catch {
-      return user.avatar
-    }
-  })
+  const [isClient, setIsClient] = React.useState(false)
+  const [displayAvatar, setDisplayAvatar] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    let isCancelled = false
+    setIsClient(true)
     try {
       const stored = localStorage.getItem('user')
-      if (!stored) return
+      if (!stored) {
+        setDisplayAvatar(user.avatar)
+        return
+      }
       const parsed = JSON.parse(stored) as { id?: string | number }
       const uid = parsed?.id ? String(parsed.id) : ''
-      if (!uid) return
+      if (!uid) {
+        setDisplayAvatar(user.avatar)
+        return
+      }
+      const cached = getCachedAvatarDataUrl(uid)
+      setDisplayAvatar(cached || user.avatar)
+
       // Refresh cache in background
       cacheAvatarDataUrl(uid, user.avatar).then(() => {
-        if (isCancelled) return
-        const cached = getCachedAvatarDataUrl(uid)
-        if (cached) setDisplayAvatar(prev => (prev !== cached ? cached : prev))
+        const refreshedCache = getCachedAvatarDataUrl(uid)
+        if (refreshedCache) setDisplayAvatar(refreshedCache)
       })
     } catch {
-      // no-op
+      setDisplayAvatar(user.avatar)
     }
-    return () => { isCancelled = true }
   }, [user.avatar])
+
+  const renderAvatar = (size: number) => (
+    <Avatar className={`h-${size} w-${size} rounded-lg overflow-hidden`}>
+      {!isClient || avatarErrored || !displayAvatar ? (
+        <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+      ) : (
+        <Image
+          src={displayAvatar}
+          alt={user.name}
+          width={size * 4}
+          height={size * 4}
+          className="h-full w-full object-cover"
+          onError={() => setAvatarErrored(true)}
+        />
+      )}
+    </Avatar>
+  )
 
   return (
     <SidebarMenu>
@@ -115,21 +120,7 @@ export function NavUser({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg overflow-hidden">
-                {avatarErrored || !displayAvatar ? (
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                ) : (
-                  <Image
-                    src={displayAvatar}
-                    alt={user.name}
-                    width={32}
-                    height={32}
-                    className="h-full w-full object-cover"
-                    priority
-                    onError={() => setAvatarErrored(true)}
-                  />
-                )}
-              </Avatar>
+              {renderAvatar(8)}
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
                 <span className="text-muted-foreground truncate text-xs">
@@ -147,20 +138,7 @@ export function NavUser({
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg overflow-hidden">
-                  {avatarErrored || !displayAvatar ? (
-                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                  ) : (
-                    <Image
-                      src={displayAvatar}
-                      alt={user.name}
-                      width={32}
-                      height={32}
-                      className="h-full w-full object-cover"
-                      onError={() => setAvatarErrored(true)}
-                    />
-                  )}
-                </Avatar>
+                {renderAvatar(8)}
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
                   <span className="text-muted-foreground truncate text-xs">

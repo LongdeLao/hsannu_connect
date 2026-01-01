@@ -10,6 +10,7 @@ import { EventForm } from "@/components/custom/event-form";
 import { EventView } from "@/components/custom/event-view";
 import { Event, fetchEvents, deleteEvent } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EventsPage() {
   const [currentView, setCurrentView] = useState<'month' | 'week' | 'day'>('month');
@@ -111,7 +112,7 @@ export default function EventsPage() {
   const upcomingEvents = getUpcomingEvents();
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-0 flex flex-col bg-gradient-to-br from-background via-background to-muted/20">
       {/* Mobile Header */}
       <div className="lg:hidden flex-none p-4 border-b border-border/50 bg-background/80 backdrop-blur">
         <div className="flex items-center justify-between">
@@ -225,14 +226,42 @@ export default function EventsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         {/* Calendar Area */}
         <div className="flex-1 lg:flex-none lg:w-0 lg:flex-grow p-4 lg:p-6 pt-0 overflow-hidden">
           {loading ? (
-            <div className="h-full flex items-center justify-center bg-background/50 rounded-2xl">
-              <div className="text-center space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Loading events...</p>
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                </div>
+                <Skeleton className="h-9 w-24 rounded-full" />
+              </div>
+              <div className="flex-1 bg-background/50 rounded-2xl overflow-hidden">
+                <div className="grid grid-cols-7 bg-muted/30">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="p-4 text-center">
+                      <Skeleton className="h-4 w-12 mx-auto" />
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-rows-6">
+                  {Array.from({ length: 6 }).map((_, row) => (
+                    <div key={row} className="grid grid-cols-7">
+                      {Array.from({ length: 7 }).map((_, col) => (
+                        <div key={col} className="p-2 border-r border-b border-border/30 min-h-[100px]">
+                          <Skeleton className="h-5 w-5 rounded-full" />
+                          <div className="mt-2 space-y-2">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-4 w-2/3" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -248,7 +277,7 @@ export default function EventsPage() {
         </div>
 
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block w-80 border-l border-border/50 bg-muted/20 p-6 overflow-auto">
+        <div className="hidden lg:block w-80 border-l border-border/50 bg-muted/20 p-6 overflow-y-auto min-h-0">
           <div className="space-y-6">
             {/* Upcoming Events */}
             <div>

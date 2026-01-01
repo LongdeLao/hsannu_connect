@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic'
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { FingerprintIcon, GalleryVerticalEnd } from 'lucide-react';
+import { FingerprintIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button as StatefulButton } from '@/components/ui/stateful-button';
 import { PointerHighlight } from "@/components/ui/pointer-highlight";
@@ -19,6 +22,7 @@ import {
   preparePublicKeyCredential,
 } from '../../../lib/webauthn';
 import Image from 'next/image';
+import { setCookie } from 'cookies-next'
 
 interface UserData {
   id: number | null;
@@ -48,6 +52,10 @@ export default function LoginPage() {
     if (errorMsg) toast.error(errorMsg);
   }, [errorMsg]);
 
+  const navigateToRoleHome = useCallback((_role?: string) => {
+    router.push('/shared/events');
+  }, [router]);
+
   // Check for existing authentication on page load
   useEffect(() => {
     const checkExistingAuth = () => {
@@ -69,18 +77,12 @@ export default function LoginPage() {
     };
 
     checkExistingAuth();
-  }, []);
+  }, [navigateToRoleHome]);
 
-  const navigateToRoleHome = (role?: string) => {
-    const normalized = (role || '').toLowerCase()
-    if (normalized === 'student') {
-      router.push('/student')
-    } else if (normalized === 'staff' || normalized === 'teacher' || normalized === 'admin') {
-      router.push('/staff')
-    } else {
-      router.push('/student')
+  const setAuthCookies = (role?: string) => {
+    setCookie('loggedIn', 'true', { maxAge: 60 * 60 * 24 * 7 })
+    if (role) setCookie('userRole', role, { maxAge: 60 * 60 * 24 * 7 })
     }
-  };
 
   const handleLogin = async (): Promise<boolean> => {
     try {
@@ -98,6 +100,7 @@ export default function LoginPage() {
         };
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('loggedIn', 'true');
+        setAuthCookies(userData.role)
         setCurrentUser(userData);
         return true;
       } else if (username === 'student' && password === 'password') {
@@ -112,6 +115,7 @@ export default function LoginPage() {
         };
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('loggedIn', 'true');
+        setAuthCookies(userData.role)
         setCurrentUser(userData);
         return true;
       }
@@ -136,6 +140,7 @@ export default function LoginPage() {
         } as UserData;
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('loggedIn', 'true');
+        setAuthCookies(userData.role)
         setCurrentUser(userData);
         return true;
       } else {
@@ -200,6 +205,7 @@ export default function LoginPage() {
       const userData: UserData = await finishResponse.json();
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('loggedIn', 'true');
+      setAuthCookies(userData.role)
       await new Promise((r) => setTimeout(r, 400));
       navigateToRoleHome(userData.role);
     } catch (err) {
@@ -227,6 +233,7 @@ export default function LoginPage() {
               width={24} 
               height={24} 
               className="rounded-md"
+              unoptimized
             />
             HSANNU Connect
           </a>
@@ -265,14 +272,13 @@ export default function LoginPage() {
                       Forgot your password?
                     </button>
                   </div>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-100"
-                    required 
-                  />
+<PasswordInput 
+   id="password" 
+   value={password}
+   onChange={(e) => setPassword(e.target.value)}
+   className="dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-100"
+   required 
+/>
                 </div>
                 <StatefulButton 
                   type="button" 
@@ -337,7 +343,8 @@ export default function LoginPage() {
               Stay on track with HSANNU <PointerHighlight><span>Connect</span></PointerHighlight>
             </div>
             <div className="font-extralight text-base md:text-xl text-neutral-200 dark:text-neutral-700 py-2 text-center max-w-md">
-              Secure authentication with modern passkey technology.
+              
+              
             </div>
           </motion.div>
         </AuroraBackground>

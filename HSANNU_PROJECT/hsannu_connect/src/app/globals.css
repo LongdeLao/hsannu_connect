@@ -225,4 +225,72 @@
   --sidebar-ring: #ba854f; /* raw_umber 600 */
 }
 
+.sage-garden {
+  --background: #edefe8; /* sage 900 */
+  --foreground: #212619; /* sage 100 */
+  --card: #e9e7e1; /* timberwolf 700 */
+  --card-foreground: #212619; /* sage 100 */
+  --popover: #e9e7e1; /* timberwolf 700 */
+  --popover-foreground: #212619; /* sage 100 */
+  --primary: #588157; /* fern_green DEFAULT */
+  --primary-foreground: #f8f7f5; /* timberwolf 900 */
+  --secondary: #dae0d0; /* sage 800 */
+  --secondary-foreground: #212619; /* sage 100 */
+  --muted: #e2dfd7; /* timberwolf 600 */
+  --muted-foreground: #434c33; /* sage 200 */
+  --accent: #344e41; /* brunswick_green DEFAULT */
+  --accent-foreground: #f8f7f5; /* timberwolf 900 */
+  --destructive: #b91c1c;
+  --border: #d1e0d9; /* brunswick_green 900 */
+  --input: #d1e0d9; /* brunswick_green 900 */
+  --ring: #a3b18a; /* sage DEFAULT */
+  --chart-1: #588157; /* fern_green DEFAULT */
+  --chart-2: #3a5a40; /* hunter_green DEFAULT */
+  --chart-3: #a3b18a; /* sage DEFAULT */
+  --chart-4: #344e41; /* brunswick_green DEFAULT */
+  --chart-5: #dad7cd; /* timberwolf DEFAULT */
+  --sidebar: #e9e7e1; /* timberwolf 700 */
+  --sidebar-foreground: #212619; /* sage 100 */
+  --sidebar-primary: #588157; /* fern_green DEFAULT */
+  --sidebar-primary-foreground: #f8f7f5; /* timberwolf 900 */
+  --sidebar-accent: #dae0d0; /* sage 800 */
+  --sidebar-accent-foreground: #212619; /* sage 100 */
+  --sidebar-border: #d1e0d9; /* brunswick_green 900 */
+  --sidebar-ring: #a3b18a; /* sage DEFAULT */
+}
+
+.rose-garden {
+  --background: #fffafb; /* misty_rose 900 */
+  --foreground: #470213; /* rose_pompadour 100 */
+  --card: #fff5f8; /* misty_rose 800 */
+  --card-foreground: #470213; /* rose_pompadour 100 */
+  --popover: #fff5f8; /* misty_rose 800 */
+  --popover-foreground: #470213; /* rose_pompadour 100 */
+  --primary: #ff8fab; /* baker-miller_pink DEFAULT */
+  --primary-foreground: #470213; /* rose_pompadour 100 */
+  --secondary: #ffe7ed; /* pink 800 */
+  --secondary-foreground: #470213; /* rose_pompadour 100 */
+  --muted: #fff0f4; /* misty_rose 700 */
+  --muted-foreground: #8d0426; /* rose_pompadour 200 */
+  --accent: #fb6f92; /* rose_pompadour DEFAULT */
+  --accent-foreground: #fffafb; /* misty_rose 900 */
+  --destructive: #b91c1c;
+  --border: #ffceda; /* pink 600 */
+  --input: #ffceda; /* pink 600 */
+  --ring: #ff8fab; /* baker-miller_pink DEFAULT */
+  --chart-1: #ff8fab; /* baker-miller_pink DEFAULT */
+  --chart-2: #ffc2d1; /* pink DEFAULT */
+  --chart-3: #ffb3c6; /* cherry_blossom_pink DEFAULT */
+  --chart-4: #fb6f92; /* rose_pompadour DEFAULT */
+  --chart-5: #ffe5ec; /* misty_rose DEFAULT */
+  --sidebar: #fff5f8; /* misty_rose 800 */
+  --sidebar-foreground: #470213; /* rose_pompadour 100 */
+  --sidebar-primary: #ff8fab; /* baker-miller_pink DEFAULT */
+  --sidebar-primary-foreground: #fffafb; /* misty_rose 900 */
+  --sidebar-accent: #ffe7ed; /* pink 800 */
+  --sidebar-accent-foreground: #470213; /* rose_pompadour 100 */
+  --sidebar-border: #ffceda; /* pink 600 */
+  --sidebar-ring: #ff8fab; /* baker-miller_pink DEFAULT */
+}
+
 

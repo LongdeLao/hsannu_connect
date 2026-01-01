@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = 'force-dynamic'
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { API_URL } from "@/config"
 import { Input } from "@/components/ui/input"
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { IconMessageCircle, IconSearch, IconSend, IconPlus, IconLoader2, IconX, IconChecks, IconChevronDown } from "@tabler/icons-react"
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface ChatUser {
   id: number
@@ -42,6 +45,16 @@ interface Message {
   content: string
   created_at: string
   read: boolean
+}
+
+interface AvailableChatUser {
+  id: number
+  first_name?: string
+  last_name?: string
+  name?: string
+  role?: string
+  profile_picture?: string
+  additional_roles?: string[]
 }
 
 function getDisplayName(user: ChatUser): string {
@@ -91,6 +104,13 @@ export default function ChatPage() {
   const [searching, setSearching] = useState(false)
   const [messagesCache, setMessagesCache] = useState<Record<number, Message[]>>({})
 
+  // New Chat dialog state
+  const [newChatOpen, setNewChatOpen] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState<AvailableChatUser[]>([])
+  const [fetchingUsers, setFetchingUsers] = useState(false)
+  const [creatingConversation, setCreatingConversation] = useState<number | null>(null)
+  const [usersError, setUsersError] = useState<string | null>(null)
+
   const listPollRef = useRef<number | null>(null)
   const msgPollRef = useRef<number | null>(null)
   const virtuosoRef = useRef<VirtuosoHandle | null>(null)
@@ -110,6 +130,8 @@ export default function ChatPage() {
     if (!others || others.length === 0) return ""
     return getDisplayName(others[0])
   }, [selectedConversation, userId])
+
+  const filteredWithMessages = useMemo(() => filtered.filter((c) => c.latest_message != null), [filtered])
 
   // Auto-grow textarea
   useEffect(() => {
@@ -144,7 +166,7 @@ export default function ChatPage() {
       console.error(e)
     }
     return [] as Message[]
-  }, [API_URL, userId, messagesCache])
+  }, [userId, messagesCache])
 
   const loadConversations = useCallback(async (initial = false) => {
     if (userId == null) return
@@ -152,14 +174,17 @@ export default function ChatPage() {
       if (initial) setLoading(true)
       const resp = await fetch(`${API_URL}/api/messaging/conversations/${userId}`, { cache: "no-store" })
       if (!resp.ok) throw new Error(`Failed to load conversations: ${resp.status}`)
-      const data = (await resp.json()) as { success: boolean; conversations: Conversation[] }
+      const data = (await resp.json()) as { success: boolean; conversations?: Conversation[] }
       if (data.success) {
-        const sorted = [...data.conversations].sort((a, b) => {
+        const convs = Array.isArray(data.conversations) ? data.conversations : []
+        const sorted = [...convs].sort((a, b) => {
           const aTime = new Date(a.latest_message?.created_at || a.created_at).getTime()
           const bTime = new Date(b.latest_message?.created_at || b.created_at).getTime()
           return bTime - aTime
         })
         setConversations(sorted)
+      } else {
+        setConversations([])
       }
     } catch (e) {
       // optional: toast
@@ -175,9 +200,12 @@ export default function ChatPage() {
       setFetchingMessages(true)
       const resp = await fetch(`${API_URL}/api/messaging/conversation/${conversationId}/messages?user_id=${userId}`)
       if (!resp.ok) throw new Error(`Failed to load messages: ${resp.status}`)
-      const data = (await resp.json()) as { success: boolean; messages: Message[] }
+      const data = (await resp.json()) as { success: boolean; messages?: Message[] | null }
       if (data.success) {
-        setMessages(data.messages)
+        const arr = Array.isArray(data.messages) ? data.messages : []
+        setMessages(arr)
+      } else {
+        setMessages([])
       }
     } catch (e) {
       console.error(e)
@@ -206,6 +234,53 @@ export default function ChatPage() {
       if (msgPollRef.current) window.clearInterval(msgPollRef.current)
     }
   }, [selectedId, loadMessages])
+
+  // Fetch available users when opening New Chat dialog
+  const fetchAvailableUsers = useCallback(async () => {
+    if (userId == null) return
+    try {
+      setFetchingUsers(true)
+      setUsersError(null)
+      const resp = await fetch(`${API_URL}/api/messaging/chat-users/${userId}`, { cache: "no-store" })
+      if (!resp.ok) throw new Error(`Failed to load users: ${resp.status}`)
+      const data = (await resp.json()) as { success: boolean; users?: AvailableChatUser[] }
+      if (!data.success || !Array.isArray(data.users)) throw new Error("Invalid response")
+      setAvailableUsers(data.users)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to load users"
+      console.error(e)
+      setUsersError(message)
+      setAvailableUsers([])
+    } finally {
+      setFetchingUsers(false)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    if (newChatOpen) void fetchAvailableUsers()
+  }, [newChatOpen, fetchAvailableUsers])
+
+  const startConversationWith = useCallback(async (otherUserId: number) => {
+    if (userId == null) return
+    try {
+      setCreatingConversation(otherUserId)
+      const resp = await fetch(`${API_URL}/api/messaging/conversations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_ids: [userId, otherUserId] }),
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data?.success) throw new Error(data?.message || "Failed to create conversation")
+      const conversationId = data.conversation_id as number
+      await loadConversations(false)
+      setSelectedId(conversationId)
+      setNewChatOpen(false)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCreatingConversation(null)
+    }
+  }, [userId, loadConversations])
 
   // Replace simple name/latest search with global message-content search when query present
   useEffect(() => {
@@ -423,7 +498,7 @@ export default function ChatPage() {
                 />
                 <IconSearch className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               </div>
-              <Button size="icon" variant="outline" title="New Chat" className="hidden md:inline-flex rounded-full">
+              <Button size="icon" variant="outline" title="New Chat" className="hidden md:inline-flex rounded-full" onClick={() => setNewChatOpen(true)}>
                 <IconPlus className="size-4" />
               </Button>
             </div>
@@ -436,11 +511,11 @@ export default function ChatPage() {
               <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
                 <IconLoader2 className="size-4 animate-spin" /> Loading conversations...
               </div>
-            ) : filtered.length === 0 ? (
+            ) : filteredWithMessages.length === 0 ? (
               <div className="p-2 text-sm text-muted-foreground">No conversations</div>
             ) : (
               <div className="flex flex-col gap-1">
-                {filtered.map(renderConversation)}
+                {filteredWithMessages.map(renderConversation)}
               </div>
             )}
           </aside>
@@ -542,17 +617,65 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
                   <IconLoader2 className="size-4 animate-spin" /> Loading conversations...
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : filteredWithMessages.length === 0 ? (
                 <div className="p-2 text-sm text-muted-foreground">No conversations</div>
               ) : (
                 <div className="flex flex-col gap-1">
-                  {filtered.map(renderConversation)}
+                  {filteredWithMessages.map(renderConversation)}
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+
+      <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
+        <DialogContent title="Start a new chat">
+          <DialogHeader>
+            <DialogTitle>Start a new chat</DialogTitle>
+            <DialogDescription>Select a user to start a conversation</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-2">
+            {fetchingUsers ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <IconLoader2 className="size-4 animate-spin" /> Loading users...
+              </div>
+            ) : usersError ? (
+              <div className="text-sm text-destructive">{usersError}</div>
+            ) : availableUsers.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No users available</div>
+            ) : (
+              availableUsers.map((u) => {
+                const name = (u.name && u.name.trim().length > 0)
+                  ? u.name
+                  : `${u.first_name || ""} ${u.last_name || ""}`.trim() || `User ${u.id}`
+                return (
+                  <button
+                    key={u.id}
+                    disabled={creatingConversation === u.id}
+                    onClick={() => void startConversationWith(u.id)}
+                    className="w-full rounded-lg p-2 hover:bg-accent/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-8">
+                        {u.profile_picture && <AvatarImage src={u.profile_picture} alt={name} />}
+                        <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{name}</div>
+                        {u.role && <div className="text-xs text-muted-foreground">{u.role}</div>}
+                      </div>
+                      <div className="ml-auto text-xs text-muted-foreground">
+                        {creatingConversation === u.id ? <IconLoader2 className="size-4 animate-spin" /> : <IconPlus className="size-4" />}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

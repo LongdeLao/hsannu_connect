@@ -10,9 +10,6 @@ import { cn } from "@/lib/utils";
 interface ImageFile extends File {
   preview?: string;
   id: string;
-  uploadProgress?: number;
-  uploadStatus?: 'pending' | 'uploading' | 'success' | 'error';
-  error?: string;
 }
 
 interface ImageUploadProps {
@@ -55,13 +52,13 @@ export function ImageUpload({
 
     fileArray.forEach((file) => {
       const error = validateFile(file);
-      const imageFile = Object.assign(file, {
-        id: generateId(),
-        preview: URL.createObjectURL(file),
-        uploadStatus: error ? 'error' as const : 'pending' as const,
-        error
-      });
-      newImages.push(imageFile);
+      if (!error) {
+        const imageFile = Object.assign(file, {
+          id: generateId(),
+          preview: URL.createObjectURL(file)
+        });
+        newImages.push(imageFile);
+      }
     });
 
     const totalImages = images.length + newImages.length;
@@ -114,15 +111,6 @@ export function ImageUpload({
       URL.revokeObjectURL(imageToRemove.preview);
     }
     onImagesChange(images.filter(img => img.id !== id));
-  }, [images, onImagesChange]);
-
-  const retryUpload = useCallback((id: string) => {
-    const updatedImages = images.map(img => 
-      img.id === id 
-        ? { ...img, uploadStatus: 'pending' as const, error: undefined }
-        : img
-    );
-    onImagesChange(updatedImages);
   }, [images, onImagesChange]);
 
   return (
@@ -207,9 +195,8 @@ export function ImageUpload({
                     </div>
                   )}
                   
-                  {/* Overlay with status */}
+                  {/* Overlay with remove button */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors">
-                    {/* Remove button */}
                     <Button
                       type="button"
                       variant="destructive"
@@ -219,50 +206,17 @@ export function ImageUpload({
                     >
                       <X className="h-3 w-3" />
                     </Button>
-                    
-                    {/* Status indicator */}
-                    <div className="absolute bottom-1 left-1">
-                      {image.uploadStatus === 'success' && (
-                        <div className="bg-green-500 text-white p-1 rounded-full">
-                          <CheckCircle className="h-3 w-3" />
-                        </div>
-                      )}
-                      {image.uploadStatus === 'error' && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => retryUpload(image.id)}
-                          className="h-6 px-2 py-0 text-xs bg-red-500 text-white border-red-500 hover:bg-red-600"
-                        >
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Retry
-                        </Button>
-                      )}
-                    </div>
                   </div>
-                  
-                  {/* Upload progress */}
-                  {image.uploadStatus === 'uploading' && image.uploadProgress !== undefined && (
-                    <div className="absolute bottom-0 left-0 right-0 p-1">
-                      <Progress value={image.uploadProgress} className="h-1" />
-                    </div>
-                  )}
                 </div>
                 
                 {/* File info */}
-                <div className="mt-1 space-y-1">
+                <div className="mt-1">
                   <p className="text-xs font-medium truncate" title={image.name}>
                     {image.name}
                   </p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{(image.size / 1024 / 1024).toFixed(1)}MB</span>
-                    {image.uploadStatus === 'error' && image.error && (
-                      <span className="text-destructive truncate ml-1" title={image.error}>
-                        {image.error}
-                      </span>
-                    )}
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {(image.size / 1024 / 1024).toFixed(1)}MB
+                  </p>
                 </div>
               </div>
             ))}

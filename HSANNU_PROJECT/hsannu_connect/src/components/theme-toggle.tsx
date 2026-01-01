@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const THEMES = ["system", "light", "dark", "deep-sea", "warm-tomes"] as const;
+const THEMES = ["system", "light", "dark", "deep-sea", "warm-tomes", "sage-garden", "rose-garden"] as const;
 
 type ThemeOption = (typeof THEMES)[number];
 

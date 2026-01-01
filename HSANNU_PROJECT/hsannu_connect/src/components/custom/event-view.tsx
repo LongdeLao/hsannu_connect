@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
-import { MapPin, Calendar, Clock } from "lucide-react";
+import { MapPin, Calendar, Clock, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Event } from "@/lib/api";
+import { Event, getImageUrl } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { ImageModel } from "@/lib/api";
 
 interface EventViewProps {
   event: Event | null;
@@ -31,6 +32,35 @@ interface EventViewProps {
   onDelete: (eventId: string) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+}
+
+interface ImageViewerProps {
+  image: ImageModel;
+  onClose: () => void;
+}
+
+function ImageViewer({ image, onClose }: ImageViewerProps) {
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0" title="Image preview">
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 z-10"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          <img
+            src={getImageUrl(image.filePath)}
+            alt="Event"
+            className="w-full h-full object-contain"
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function EventView({
@@ -44,6 +74,7 @@ export function EventView({
 }: EventViewProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ImageModel | null>(null);
   const { toast } = useToast();
 
   if (!event) return null;
@@ -81,7 +112,7 @@ export function EventView({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" title={event.title || "Event details"}>
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-foreground">
               {event.title}
@@ -118,49 +149,79 @@ export function EventView({
                   <p className="whitespace-pre-wrap">{event.eventDescription}</p>
                 </div>
               )}
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2">
-              {canEdit && (
-                <Button variant="outline" onClick={handleEdit}>
-                  Edit
-                </Button>
+              {/* Event Images */}
+              {event.images && event.images.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-medium text-foreground">Images</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {event.images.map((image, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-lg overflow-hidden bg-muted cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setSelectedImage(image)}
+                      >
+                        <img
+                          src={getImageUrl(image.filePath)}
+                          alt={`Event image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-              {canDelete && (
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
-              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2">
+                {canEdit && (
+                  <Button variant="outline" onClick={handleEdit}>
+                    Edit
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the event.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {selectedImage && (
+        <ImageViewer
+          image={selectedImage}
+          onClose={() => setSelectedImage(null)}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your
+                event.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
-} 
+}
